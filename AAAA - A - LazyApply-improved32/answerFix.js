@@ -9,6 +9,8 @@
  *  - work permit / passport / "authorised to work in X": from the profile's
  *    "Authorised to work" list, citizenship and visa requirement. If those do
  *    not settle it, nothing is picked (never guessed);
+ *  - "Do you currently reside / live / are you based in X?": Yes when X is
+ *    a European country (or "the EU"), the UK, the United States or Canada;
  *  - visa sponsorship needed: from the profile's visa requirement;
  *  - willing to relocate: from the profile;
  *  - available for the job's hybrid / office days: Yes (the job states it and
@@ -52,6 +54,11 @@
     c = norm(c);
     return ALIAS[c] || DEMONYM[c] || c;
   };
+  // "Do you currently reside in X?": Yes for every European country, the UK,
+  // the United States and Canada.
+  const EUROPE_OTHER = ["united kingdom", "switzerland", "norway", "iceland", "liechtenstein", "albania", "andorra", "armenia", "azerbaijan", "belarus", "bosnia and herzegovina", "bosnia", "georgia", "kosovo", "moldova", "monaco", "montenegro", "north macedonia", "macedonia", "san marino", "serbia", "turkey", "turkiye", "ukraine", "vatican", "scotland", "wales", "northern ireland"];
+  const RESIDE_YES = new Set(EU.concat(EUROPE_OTHER, ["united states", "canada"]));
+  const RESIDE = /\b(reside|residing|resident|residence|live|living|based|located|domiciled)\b/;
 
   function misc(profile) {
     return (profile && profile.resume_data && profile.resume_data.miscellaneous) || {};
@@ -104,7 +111,7 @@
   function placeAsked(q, jobPlace) {
     const t = " " + norm(q) + " ";
     if (EU_WORDS.test(t)) return { eu: true };
-    const all = EU.concat(EEA_EXTRA, OTHER, Object.keys(ALIAS));
+    const all = EU.concat(EEA_EXTRA, OTHER, EUROPE_OTHER, Object.keys(ALIAS));
     for (const c of all) if (t.includes(" " + c + " ")) return { country: canon(c) };
     const jp = " " + norm(jobPlace) + " ";
     for (const c of all) if (jp.includes(" " + c + " ")) return { country: canon(c), fromJob: true };
@@ -181,6 +188,10 @@
     return null;
   }
 
+  // A question about where the user lives now (not relocation, commuting or
+  // work rights, which have their own rules).
+  const resideQuestion = (t) => RESIDE.test(t) && /\b(do|are|is|currently|you)\b/.test(t) && !RELOCATE.test(t) && !SPONSOR.test(t) && !WORK_RIGHT.test(t) && !/\b(commut|distance|miles|km|kilometres|kilometers|within \d)/.test(t);
+
   /** Answer for one question, or null to leave it as it is. */
   function answerFor(q, profile, jobPlace) {
     const question = String((q && (q.question || q.label)) || "");
@@ -216,6 +227,13 @@
       }
       if (yes === null && r.visa === "need sponsorship" && !r.known) yes = false;
       return yes === null ? null : yes ? YES(opts) || null : NO(opts) || null;
+    }
+    // 2b. "Do you currently reside / live / are you based in X?": Yes for
+    // Europe (and "the EU"), the UK, the United States and Canada.
+    if (resideQuestion(t)) {
+      const where = placeAsked(question, jobPlace);
+      if (where.eu || (where.country && RESIDE_YES.has(where.country))) return YES(opts) || null;
+      return null;
     }
     // 3. Visa sponsorship needed: from the profile's visa requirement.
     if (SPONSOR.test(t)) {
@@ -295,7 +313,7 @@
         const ours = answerFor(q, profile, place);
         const opts = q.options.map((o) => (typeof o === "object" && o ? o.label || o.text || o.value : o));
         const tq = norm(q.question);
-        if (ours && (WORK_RIGHT.test(tq) || SPONSOR.test(tq) || REGION_Q.test(tq) || PREFIX_Q.test(tq))) {
+        if (ours && (WORK_RIGHT.test(tq) || SPONSOR.test(tq) || REGION_Q.test(tq) || PREFIX_Q.test(tq) || resideQuestion(tq))) {
           q.answer = ours; // the profile decides these, not the AI
           why = "from your profile";
           continue;
