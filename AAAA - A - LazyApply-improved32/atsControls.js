@@ -395,6 +395,39 @@
   }
   const saveWorkdayAccount = async (company, email, password) => rememberAccount("workday", company, email, password);
 
+  /**
+   * Workday "verify your account" email: the background finds the link in
+   * Gmail and opens it (wdVerify.js, gmailVerify.js). Stands in for the
+   * bundle's call to LazyApply's verify server, which no longer exists, and is
+   * also started by workdayStuck.js when it sees the "verify" message. One
+   * request at a time per page; resolves { ok, error }.
+   */
+  const verify = { busy: null, since: 0, ended: 0, result: null };
+  function verifyWorkdayEmail(company, email) {
+    if (verify.busy) return verify.busy;
+    const typed = document.querySelector('input[data-automation-id="email"]');
+    const saved = company ? acct.accounts[accountKey("workday", company)] : null;
+    const who = String(email || (saved && saved.email) || (typed && typed.value) || acct.workdayEmail || (acct.creds && acct.creds.email) || "").trim();
+    verify.since = Date.now();
+    verify.busy = new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: "LAZY_WD_VERIFY", email: who, since: Date.now() - 3600000 }, (r) => {
+          void chrome.runtime.lastError;
+          resolve(r && typeof r === "object" ? r : { ok: false, error: "no answer from the extension" });
+        });
+      } catch (e) {
+        resolve({ ok: false, error: "the extension was reloaded" });
+      }
+    }).then((r) => {
+      verify.result = r;
+      verify.ended = Date.now();
+      verify.busy = null;
+      return r;
+    });
+    return verify.busy;
+  }
+  const verifyState = () => ({ busy: !!verify.busy, since: verify.since, ended: verify.ended, result: verify.result });
+
   /** iCIMS with no saved sign-in anywhere: the user's own email + local password, never a shared login. */
   function icimsFallback(company) {
     const a = acct.accounts[accountKey("icims", company)];
@@ -760,5 +793,5 @@
     } catch (e) {}
   }
 
-  g.__lazyAts = { jobSubmitted, rememberProfile, referralInfo, pageNotFound, applyRetry, applyWait, pageJobMeta, jobMetaFromText, jobMetaFromLd, ownMail, emailGate, emailOutcome, emailLog, jobIdFromText, jobIdFromLd, pageJobId, captureJobId, findPeopleFetch, accountPassword, workdayAccount, saveWorkdayAccount, icimsFallback, norm, similarity, matchIndex, bestNode, sharesWord, closeList, setSpin, setDateParts, submittedMark, textOf, searchOther, version: 1 };
+  g.__lazyAts = { jobSubmitted, rememberProfile, referralInfo, pageNotFound, applyRetry, applyWait, pageJobMeta, jobMetaFromText, jobMetaFromLd, ownMail, emailGate, emailOutcome, emailLog, jobIdFromText, jobIdFromLd, pageJobId, captureJobId, findPeopleFetch, accountPassword, workdayAccount, saveWorkdayAccount, icimsFallback, norm, similarity, matchIndex, bestNode, sharesWord, closeList, setSpin, setDateParts, submittedMark, textOf, searchOther, verifyWorkdayEmail, verifyState, version: 1 };
 })();

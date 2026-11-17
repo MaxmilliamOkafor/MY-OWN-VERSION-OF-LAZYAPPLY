@@ -17,8 +17,10 @@
  * hard limit that applies even while busy, so a loop is still left.
  *
  * The job is left:
- *  - after 8 s on a dead end (error page, job closed, "verify your email",
- *    locked account);
+ *  - after 8 s on a dead end (error page, job closed, locked account);
+ *  - "verify your account": first the emailed link is fetched from Gmail and
+ *    opened (atsControls.js / wdVerify.js); the job waits while that runs and
+ *    for 45 s after it worked, and is left 8 s after it did not;
  *  - on a sign-in / create-account screen: after 30 s there with the
  *    automation idle, or 120 s there in total; with the same sign-in error
  *    shown for 12 s while idle, or 45 s in total ("wrong email or password"
@@ -48,6 +50,7 @@
     hands: 60000,
     required: 20000, requiredMax: 75000,
     seenMax: 200,
+    verifyGrace: 45000,
   };
   const WD_HOST = /(^|\.)(myworkdayjobs|myworkdaysite|myworkday)\.com$/i;
   const OTHER_HOST = /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com|icims\.com|rippling\.com|smartrecruiters\.com)$/i;
@@ -115,10 +118,26 @@
   }
   const secs = (ms) => Math.round(ms / 1000) + " s";
 
+  const VERIFY_WHY = "email verification needed";
+  // Nothing counts against the job (the verification email is being fetched).
+  function hold(s, p, now) {
+    s.moved = now; s.deadSince = null;
+    s.authSince = p.auth ? now : null;
+    s.errText = p.errors || ""; s.errSince = p.errors ? now : null;
+    return "";
+  }
+
   // One check: returns why to skip, or "". `s` carries the timers between checks.
   function step(s, p, now) {
     if (progressed(s, p, now)) { s.errSince = null; s.deadSince = null; }
     if (p.submitted) { s.moved = now; s.authSince = null; return ""; }
+    // "Verify your account": get the emailed link before giving up.
+    const v = s.verifier ? s.verifier() : null;
+    if (v && v.busy) return hold(s, p, now);
+    if (p.dead === VERIFY_WHY && s.verifier) {
+      if (!s.verifyTried && !(v && v.result)) { s.verifyTried = now; if (s.startVerify) s.startVerify(); return hold(s, p, now); }
+      if (v && v.result && v.result.ok && now - v.ended < STUCK.verifyGrace) return hold(s, p, now);
+    }
     if (p.auth) { if (s.authSince == null) s.authSince = now; } else s.authSince = null;
     if (now - s.hands < STUCK.hands) return "";
     const busy = s.busy || -Infinity;
@@ -170,6 +189,11 @@
     ["keydown", "mousedown", "touchstart"].forEach((t) => document.addEventListener(t, touch, true));
     // The automation's own clicks / typing (script events) mean it is busy.
     const work = (e) => { if (!e.isTrusted) s.busy = Date.now(); };
+    const ats = () => g.__lazyAts && g.__lazyAts.verifyState ? g.__lazyAts : null;
+    if (wd) {
+      s.verifier = () => (ats() ? ats().verifyState() : null);
+      s.startVerify = () => { if (ats()) ats().verifyWorkdayEmail(null, null); };
+    }
     ["click", "input", "change", "keydown", "mousedown", "mouseup", "focusin"].forEach((t) => document.addEventListener(t, work, true));
     const timer = setInterval(() => {
       if (s.sent) return;
@@ -194,6 +218,6 @@
     }, STUCK.tick);
   }
 
-  g.__lazyStuck = { probe, step, stepOther, fresh, STUCK };
+  g.__lazyStuck = { probe, step, stepOther, fresh, hold, STUCK };
   try { watch(); } catch (e) {}
 })();

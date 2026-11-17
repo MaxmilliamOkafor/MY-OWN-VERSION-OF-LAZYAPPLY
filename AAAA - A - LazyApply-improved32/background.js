@@ -36,7 +36,7 @@ try {
 }
 // Optional LeadOcean contact finder for referral emails (see leadOcean.js).
 try {
-  importScripts("emailVars.js", "leadOcean.js", "ownMail.js");
+  importScripts("emailVars.js", "leadOcean.js", "ownMail.js", "wdVerify.js");
 } catch (error) {
   console.error("LeadOcean finder failed to load", error);
 }
