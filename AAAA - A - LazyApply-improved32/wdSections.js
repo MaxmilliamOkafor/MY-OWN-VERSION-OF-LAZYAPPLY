@@ -22,6 +22,12 @@
  * deleted. Nothing is made up: dates come only from the profile, and an entry
  * whose end date is before its start date gets no dates at all.
  *
+ * After the page is filled, reconcile() checks every Work Experience entry in
+ * page order against the profile job at the same place and corrects title,
+ * company, location, description, "I currently work here" and from / to
+ * (Workday's resume parse pre-fills entries, e.g. the same job twice with a
+ * start date after its end). It adds missing entries and deletes extra ones.
+ *
  * Copied into atsAutomation.bundle.js (between the LAZY_WD_SECTIONS markers)
  * and loaded on its own by the tests.
  */
@@ -464,6 +470,173 @@
     return keep;
   }
 
-  g.__lazyWdSections = { fix, isCurrentGroup, parseDate, links, fieldOfStudy, entryOf, fieldOf, mmYYYY, languages, levelRank, levelOption, langEntryOf, socialLink };
+  // ---- Final check of every Work Experience entry ---------------------------
+  // Workday pre-fills entries from the uploaded resume, often wrongly (the
+  // same job twice, a start date from another job). After the page is filled,
+  // each entry is compared with the profile job at the same place (entry 1 =
+  // first job, ...) and corrected: title, company, location, description,
+  // "I currently work here", from / to. Missing entries are added, extra ones
+  // deleted. Values are set through the input's native setter so Workday's
+  // React state takes them (a plain `el.value = x` is reverted).
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const same = (a, b) => str(a).toLowerCase() === str(b).toLowerCase();
+  function nativeSet(el, v) {
+    const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const d = Object.getOwnPropertyDescriptor(proto, "value");
+    try {
+      el.focus();
+    } catch (e) {}
+    if (d && d.set) d.set.call(el, v);
+    else el.value = v;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    try {
+      el.blur();
+    } catch (e) {}
+  }
+  const visible = (el) => {
+    try {
+      const s = getComputedStyle(el);
+      return s.display !== "none" && s.visibility === "visible";
+    } catch (e) {
+      return true;
+    }
+  };
+  function workGroups(root) {
+    const doc = root && root.querySelectorAll ? root : document;
+    const seen = new Map();
+    for (const n of doc.querySelectorAll('[role="group"][aria-labelledby]')) {
+      const l = n.getAttribute("aria-labelledby") || "";
+      if (/-section$/i.test(l) || kindOf(l) !== "work") continue;
+      const at = entryOf(n.querySelector("input, textarea, button") || n);
+      if (at && at.kind === "work" && at.group === n && !seen.has(n)) seen.set(n, at.index);
+    }
+    return Array.from(seen.entries())
+      .sort((a, b) => a[1] - b[1])
+      .map((x) => x[0]);
+  }
+  function workSection(root) {
+    const doc = root && root.querySelectorAll ? root : document;
+    return Array.from(doc.querySelectorAll('[role="group"][aria-labelledby$="-section"]')).find((n) => /work-?experience/i.test(n.getAttribute("aria-labelledby") || "")) || null;
+  }
+  function addButton(section) {
+    if (!section) return null;
+    const own = Array.from(section.querySelectorAll('button[data-automation-id="add-button"], button')).filter((b) => {
+      const up = b.closest('[role="group"][aria-labelledby]');
+      return up === section && (b.getAttribute("data-automation-id") === "add-button" || /^add( another)?$/i.test(str(b.textContent)));
+    });
+    return own[own.length - 1] || null;
+  }
+  const labelOf = (el) => {
+    const id = el.id;
+    const lab = id && el.ownerDocument && el.ownerDocument.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+    return str((lab && lab.textContent) || el.getAttribute("aria-label") || "");
+  };
+  // {month, year} spin boxes of a date in this entry ("start" / "end").
+  function dateBoxes(group, which) {
+    const wraps = Array.from(group.querySelectorAll('[data-automation-id="dateInputWrapper"]')).filter(visible);
+    let w = wraps.find((x) => new RegExp(which === "start" ? "startdate" : "enddate", "i").test((x.id || "") + " " + (x.getAttribute("data-fkit-id") || "") + " " + ((x.querySelector("input") || {}).id || "")));
+    if (!w) {
+      const lab = which === "start" ? /^from\b|start/i : /^to\b|end/i;
+      const caption = (x) => {
+        const box = x.closest("fieldset") || x.parentElement || x;
+        const l = box.querySelector("legend, label");
+        return str(l && l.textContent);
+      };
+      w = wraps.find((x) => lab.test(caption(x)));
+    }
+    if (!w && wraps.length === 2) w = which === "start" ? wraps[0] : wraps[1];
+    if (!w) return null;
+    const spins = Array.from(w.querySelectorAll('input[role="spinbutton"], input'));
+    const kind = (e) => ((e.getAttribute("aria-label") || "") + " " + (e.getAttribute("data-automation-id") || "")).toLowerCase();
+    return { wrap: w, month: spins.find((e) => kind(e).includes("month")) || null, year: spins.find((e) => kind(e).includes("year")) || null };
+  }
+  const boxVal = (el) => str(el && (el.value || el.getAttribute("aria-valuetext") || "")).replace(/\D/g, "");
+  async function setBox(el, v) {
+    const ats = typeof globalThis !== "undefined" && globalThis.__lazyAts;
+    if (ats && ats.setDateParts) await ats.setDateParts([[el, v]]);
+    else {
+      nativeSet(el, v);
+      await sleep(80);
+    }
+  }
+  async function setDate(group, which, d, log) {
+    const b = dateBoxes(group, which);
+    if (!b || !d) return;
+    const mm = d.m ? String(d.m).padStart(2, "0") : "";
+    const yy = String(d.y);
+    const nowM = boxVal(b.month).padStart(2, "0");
+    const nowY = boxVal(b.year);
+    if ((mm && b.month && nowM !== mm) || (b.year && nowY !== yy)) {
+      if (mm && b.month) await setBox(b.month, mm);
+      if (b.year) await setBox(b.year, yy);
+      log.push(which + " " + (mm ? mm + "/" : "") + yy + " (was " + (nowM || "MM") + "/" + (nowY || "YYYY") + ")");
+    }
+  }
+
+  async function reconcile(profile, root) {
+    const W = jobs(profile);
+    if (!W.length) return 0;
+    let groups = workGroups(root);
+    if (!groups.length && !workSection(root)) return 0; // not the My Experience page
+    const changes = [];
+    // Add missing entries (Workday's resume parse often makes fewer).
+    for (let i = 0; groups.length < W.length && i < W.length; i++) {
+      const add = addButton(workSection(root));
+      if (!add) break;
+      add.click();
+      await sleep(900);
+      const now = workGroups(root);
+      if (now.length <= groups.length) break;
+      groups = now;
+      changes.push("added entry " + groups.length);
+    }
+    // Delete extra entries, last first.
+    for (let i = groups.length - 1; i >= W.length; i--) {
+      if (clickDelete(groups[i])) {
+        changes.push("deleted extra entry " + (i + 1));
+        await sleep(600);
+      }
+    }
+    groups = workGroups(root).slice(0, W.length);
+    for (let i = 0; i < groups.length; i++) {
+      const grp = groups[i];
+      const w = W[i];
+      const log = [];
+      for (const el of grp.querySelectorAll("input, textarea")) {
+        if (!visible(el) || el.disabled || el.readOnly) continue;
+        const t = (el.type || "").toLowerCase();
+        if (el.tagName === "INPUT" && t !== "text" && t !== "") continue;
+        if (el.getAttribute("role") === "spinbutton" || el.getAttribute("role") === "combobox" || el.closest('[data-automation-id="dateInputWrapper"]')) continue;
+        const field = fieldOf(el, labelOf(el));
+        if (!/^(title|company|location|description)$/.test(field)) continue;
+        const want = workValue(w, field);
+        if (!want) continue; // the profile has nothing: leave it
+        if (field === "description" ? str(el.value) === str(want) : same(el.value, want)) continue;
+        log.push(field + ' "' + str(want).slice(0, 40) + '" (was "' + str(el.value).slice(0, 40) + '")');
+        nativeSet(el, want);
+        await sleep(120);
+      }
+      const box = grp.querySelector('input[type="checkbox"][id*="currentlyWorkHere"]') || Array.from(grp.querySelectorAll('input[type="checkbox"]')).find((b) => fieldOf(b, labelOf(b)) === "current");
+      if (box && !!box.checked !== isCurrent(w)) {
+        box.click();
+        log.push("current " + (isCurrent(w) ? "ticked" : "unticked"));
+        await sleep(400);
+      }
+      const s = parseDate(w.startDate);
+      const e = isCurrent(w) ? null : parseDate(w.endDate);
+      const datesOk = !(s && e && (e.y < s.y || (e.y === s.y && e.m && s.m && e.m < s.m)));
+      if (s) await setDate(grp, "start", s, log);
+      if (e && datesOk) await setDate(grp, "end", e, log);
+      if (log.length) changes.push("entry " + (i + 1) + " (" + (nameOf(w.company) || str(w.jobTitle)) + "): " + log.join(", "));
+    }
+    try {
+      if (self.__lazyDbg) self.__lazyDbg.log("field", changes.length ? "info" : "debug", "Workday Work Experience check: " + (changes.length ? changes.join("; ") : "all " + groups.length + " entries match your profile"));
+    } catch (x) {}
+    return changes.length;
+  }
+
+  g.__lazyWdSections = { fix, reconcile, workGroups, isCurrentGroup,parseDate, links, fieldOfStudy, entryOf, fieldOf, mmYYYY, languages, levelRank, levelOption, langEntryOf, socialLink };
   if (typeof module !== "undefined" && module.exports) module.exports = g.__lazyWdSections;
 })(typeof self !== "undefined" ? self : globalThis);
