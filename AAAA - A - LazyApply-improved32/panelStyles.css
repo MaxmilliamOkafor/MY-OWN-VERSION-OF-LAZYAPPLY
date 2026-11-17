@@ -1,0 +1,1243 @@
+/* Copy of the "Automation In Progress" panel styles, added with insertCSS so a
+   site that rebuilds its page cannot strip them. Generated from autoFillTemplate.bundle.js. */
+.lazyapply-button-container {
+  font-family: sans-serif;
+  text-align: center;
+  position: relative;
+  display: inline-block;
+  position: fixed;
+  top: 10px;
+  right: 5px;
+  z-index: 10000;
+}
+
+.lazyapplyPersonHeading {
+  font-weight: bold;
+  font-size: 20px;
+  margin: 10px;
+  margin-left: 0px;
+}
+
+.lazyapplyPerson {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: row;
+  border-radius: 5px;
+  background-color: white;
+  box-shadow: 1px 1px 1.5px 1.5px #efefef, 1px 1px 1.5px 1.5px #efefef;
+}
+
+.lazyapplyPersonImg {
+  background-color: cornflowerblue;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.lazyapplyPersonDetails {
+  display: flex;
+  margin-left: 20px;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.lazyapplyPersonImg img {
+  width: 25px;
+}
+
+.lazyapply-button-container-main {
+  display: flex;
+  justify-content: center;
+  background-color: aliceblue;
+  /* border: 2px solid lightskyblue; */
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3), 0 20px 30px rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  align-items: center;
+  padding: 0px 20px;
+}
+
+.lazyapply-button-container-main img {
+  width: 50px;
+}
+
+.lazyapply-buttons-main {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.lazyapply-containerMain {
+  position: absolute;
+  top: unset;
+  right: 50%;
+  width: 100%;
+  transform: translateX(50%);
+  /* background: lavender; */
+  background:  aliceblue;
+  transition: all 0.3s ease-in-out;
+  display: flex;
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3), 0 20px 30px rgba(0, 0, 0, 0.2);
+  flex-direction: column;
+}
+
+.lazyapply-firstSectionContainerMain {
+  padding: 10px;
+  margin-top: 20px;
+  text-align: left !important;
+}
+
+
+
+.lazyapply-firstSectionContainerMain p {
+  margin: 0px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #4682B4;
+  margin-left: 17px;
+  font-family:  sans-serif;
+  margin-bottom: 8px;
+}
+
+.lazyapply-refreshButton {
+  border: none;
+  margin-right: 10px;
+  margin-bottom: 15px;
+  background-color: aliceblue;
+  font-size: 30px;
+  cursor: pointer !important;
+  color: #0056b3;
+  border-radius: 8px;
+  /* padding: 5px; */
+  
+}
+
+.lazyapply-refreshButton i {
+  font-size: 15px;
+}
+
+.lazyapply-containerClosed {
+  overflow: hidden;
+  height: 0;
+}
+
+.lazyapply-containerOpened {
+  max-height: 300px;
+  min-height: 200px;
+  margin-top: 10px;
+  overflow: auto;
+  border-radius: 10px;
+  height: 250px;
+}
+
+
+
+.lazyapply-dropdown-label {
+  background-color: #007bff;
+  color: white;
+  padding: 10px;
+  margin-top: 20px;
+  border-radius: 5px;
+}
+
+.lazyapply-uploadResume {
+
+  background: none;
+    /* color: blue; */
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+  /* background-color: #007bff; */
+  font-weight: bold;
+  color: #4169E1;
+  /* border: none; */
+  /* padding: 10px; */
+  font-size: 18px;
+  font-family: sans-serif;
+  /* width: 100%; */
+  /* border-radius: 12px; */
+  /* margin-left: 5px; */
+  /* margin-top: 20px; */
+  cursor: pointer !important;
+}
+
+.lazyapply-uploadResume:hover {
+  color:  #0f4afc;
+}
+
+
+
+.lazyapply-enableAIContainer {
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  padding: 10px;
+  width: 100%;
+  flex-direction: row;
+  height: 100%;
+}
+
+.lazyapply-enableAIContainerLabel {
+  margin-right: 10px;
+  color: black;
+  font-weight: bold;
+}
+
+.lazyapply-ai-toggle-container {
+  position: relative;
+  width: 60px;
+  height: 30px;
+}
+
+.lazyapply-ai-toggle-checkbox {
+  display: none;
+}
+
+.lazyapply-ai-toggle-label {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60px;
+  height: 30px;
+  background-color: gray;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.lazyapply-ai-toggle-inner {
+  display: block;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 26px;
+  height: 26px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.lazyapply-ai-toggle-switch {
+  display: block;
+  position: absolute;
+  top: 2px;
+  left: 32px;
+  width: 26px;
+  height: 26px;
+  background-color: white;
+  border-radius: 50%;
+  box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s;
+}
+
+.lazyapply-ai-toggle-checkbox:checked + .lazyapply-ai-toggle-label {
+  background-color: green;
+}
+
+.lazyapply-ai-toggle-checkbox:checked
+  + .lazyapply-ai-toggle-label
+  .lazyapply-ai-toggle-inner {
+  transform: translateX(30px);
+}
+
+.lazyapply-ai-toggle-checkbox:checked
+  + .lazyapply-ai-toggle-label
+  .lazyapply-ai-toggle-switch {
+  transform: translateX(30px);
+}
+
+.lazyapply-dropdown-container {
+  /* position: relative; */
+  margin-left: 15px;
+  width: 90%;
+}
+
+.lazyapply-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #007bff;
+  background-color: white;
+  color: black;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.lazyapply-dropdown-header:hover {
+  background-color: lightblue;
+  border-color: lightblue;
+}
+
+.lazyapply-selected-option {
+  margin-right: 5px;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.lazyapply-dropdown-icon {
+  font-size: 10px;
+  margin-right: 10px;
+}
+
+.lazyapply-dropdown-list {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-top: none;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lazyapply-dropdown-option {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.lazyapply-dropdown-option:hover {
+  background-color: #f5f5f5;
+}
+
+.lazyapply-selected-resume-text {
+  font-weight: bold;
+  margin-top: 35px;
+  display: flex;
+  align-items: center;
+  /* color: #008B8B; */
+  justify-content: start;
+  font-family: sans-serif;
+  text-decoration: underline;
+  margin-left: 17px;
+  margin-bottom: 20px;
+}
+
+.lazyapply-selected-resume-text a {
+  font-weight: bold;
+  color: #4169E1;
+  font-size: 18px;
+  text-decoration: underline;
+}
+
+.lazyapply-selected-resume-text a:hover {
+  color: #0f4afc;
+}
+
+
+
+.containerProgressLazyapply {
+  position: fixed;
+  top: 250px;
+  right: 10px;
+  width: 250px;
+  height: 200px;
+  border: 2px solid #007bff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: white;
+  padding: 20px 50px;
+  border-radius: 10px;
+  z-index: 110000;
+}
+
+.containerProgressLazyapplyCross {
+  position: absolute !important;
+  top: 0px !important;
+  right: 0px !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background-color: aliceblue !important;
+  border: none !important;
+  color: black !important;
+  font-size: 18px !important;
+  font-weight: bolder !important;
+  line-height: 30px !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+
+
+  /* outline: none !important;
+  color: #007bff !important;
+  color: red !important;
+  font-size: 20px !important;
+  font-weight: bolder !important;
+  padding: 0px !important;
+  margin: 0px !important;
+  background-color: unset !important;
+  background: unset !important; */
+}
+
+.containerProgressLazyapplyCross:hover {
+  background-color: #c8e3fc !important; 
+}
+
+.containerProgressLazyapplyCross:focus {
+  outline: none;
+}
+
+.containerProgressLazyapply p {
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.containerProgressLazyapplySpinnerContainer {
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.containerProgressLazyapplySpinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #333;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.lazyapplyReferralMain {
+  display: flex;
+  flex-direction: row;
+}
+
+#linkedinSendEmail {
+  position: fixed;
+  z-index: 100000;
+  /* top: 50%; */
+  /* left: 50%; */
+  /* width: 80%; */
+  transform: translate(-50%, -50%);
+  top: 50%;
+  left: 50%;
+  width: 80%;
+  height: inherit;
+  /* display: block;
+  position: fixed;
+  top: 0%;
+  left: 0%;
+  width: 100%;
+  height: 100%;
+  /* background-color: rgba(0, 0, 0, 0.5); */
+  /* justify-content: center;
+  align-items: center;
+  z-index: 100000; */
+}
+
+#linkedinSendEmail .containerLz {
+  background: floralwhite !important;
+  /* width: 80% !important; */
+  border: 2px solid cadetblue !important;
+  padding: 30px 30px 30px 30px;
+  /* position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important; */
+}
+
+.lazyapplyCompleteSteps {
+  font-size: 25px;
+  font-size: bold;
+  color: #007bff;
+  margin-bottom: 10px;
+  margin-top: 10px;
+}
+
+.lazyapplyPermissionText {
+  font-weight: bold;
+}
+
+.lazyapplyPermissionText::before {
+  content: "•";
+  margin-right: 0.5em;
+  font-size: 25px;
+}
+
+.lazyapplyClickHere {
+  font-size: 15px;
+  color: blue;
+  cursor: pointer;
+}
+
+.lazyapplyspinner {
+  display: inline-block;
+  margin-left: 5px;
+  border: 2px solid rgba(0, 0, 0, 0.1); /* Light grey border */
+  border-top: 2px solid white; /* Blue top border */
+  border-radius: 50%; /* Circular shape */
+  width: 20px; /* Size of the spinner */
+  height: 20px;
+  animation: spin 2s linear infinite; /* Animation */
+  margin-bottom: 0px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.lazyapply-cross-icon {
+  width: 30px; /* Width of the cross */
+  height: 30px; /* Height of the cross */
+  position: relative; /* Position relative for pseudo-elements */
+}
+
+.lazyapply-feedback-button {
+  position: absolute;
+  top: 2%;
+  right: 7%;
+  background: orange;
+  padding: 10px;
+  border-radius: 5px;
+  color: white;
+  font-weight: bold;
+}
+
+.lazyapply-cross-icon:before,
+.lazyapply-cross-icon:after {
+  content: "";
+  position: absolute;
+  height: 100%;
+  width: 2px; /* Thickness of the cross lines */
+  background: black; /* Color of the cross */
+  top: 2%;
+  right: 1%;
+}
+
+.lazyapply-cross-icon:before {
+  transform: rotate(45deg); /* Rotate line for cross */
+}
+
+.lazyapply-cross-icon:after {
+  transform: rotate(-45deg); /* Rotate line for cross */
+}
+
+.lazyapply-ai-button {
+  background-color: #4caf50; /* Green background */
+  color: white; /* White text */
+  padding: 15px 32px; /* Padding for size */
+  font-size: 16px; /* Font size */
+  border: none; /* No border */
+  border-radius: 5px; /* Rounded corners */
+  cursor: pointer; /* Pointer cursor on hover */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Shadow for 3D effect */
+  transition: all 0.3s; /* Transition for smooth hover effect */
+  /* margin-left: 15px; */
+}
+
+.lazyapply-ai-button:hover {
+  background-color: #45a049; /* Darker shade of green on hover */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); /* Larger shadow on hover */
+  transform: translateY(-2px); /* Slightly raise the button */
+}
+
+.lazyapply-ai-button:active {
+  background-color: #3e8e41; /* Even darker green when clicked */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Smaller shadow when clicked */
+  transform: translateY(1px); /* Button goes back down when clicked */
+}
+
+.lazyapplyEmailNotFound {
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+  margin: 20px 20px;
+}
+
+.lazyapplyEmailFound {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 20px 0px;
+  color: black;
+}
+
+.lazyapply-cross-button {
+  position: fixed;
+  top: 3%;
+  right: 3%;
+}
+
+#lazyapplyTextArea {
+  margin: 5px 0px;
+}
+
+.lazyapplyLabel {
+  font-weight: bold;
+  color: black;
+}
+
+.lazyapply-firstSectionContainerMainCustom {
+  padding: 0px !important;
+  margin-bottom: 20px;
+}
+
+.lazyapply-firstSectionContainerMainCustom .lazyapply-selected-resume-text {
+  font-size: 12px !important;
+}
+
+.lazyapply-referral-select {
+  width: 50%;
+}
+
+.lazyapply-referral-select  {
+  width: 80%;
+}
+
+
+
+
+
+.lazyapply-autofill-button {
+  /* background-color: #007bff; */
+  background: linear-gradient(45deg, #f76b1c, #fbbf24, #e1f512) !important;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 25px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1), 0 20px 30px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease;
+} 
+
+.lazyapply-autofill-button:hover {
+  /* background-color: #0056b3; */
+  background: linear-gradient(45deg, #e1f512, #fbbf24, #f76b1c) !important;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+
+
+.lazyapply-configuration {
+  margin-left: 10px;
+  background: aliceblue ;
+  border: none;
+  display: inline-block;
+  /* color: black; */
+  /* padding: 0 10px; */
+  font-weight: bold; 
+  /* font-size: 18px; */
+  /* border-radius: 5px; */
+  /* width: 100%; */
+  /* padding: 10px; */
+  /* margin-top: 20px; */
+  cursor: pointer;
+} 
+
+.lazyapply-settings-icon {
+  font-size: 40px;
+  color: black;
+  font-weight: bold;
+  cursor: pointer;  
+  transition: all 0.3s ease;
+  /* box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.1); */
+}
+
+.lazyapply-settings-icon:hover {
+  /* font-size: 40px; */
+  color: #e0e0e0;
+  /* box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 3px 6px rgba(0, 0, 0, 0.2); */
+}
+
+
+
+/* .lazyapply-configuration:hover {
+  background: darkblue;
+  columns: white;
+} */
+
+
+.apply-button-container {
+  display: inline-flex;
+  /* justify-content: center; */
+  gap: 10px; 
+  /* padding: 20px; */
+}
+
+.lazyapply-resume-container {
+  display: inline-flex; 
+  /* justify-content: center; */
+   gap: 10px; 
+   align-items: center;
+   margin-top: 10px;
+}
+
+
+.resume-upload-container{
+
+  display: inline-flex; 
+  /* justify-content: center; */
+  margin-left: 17px;
+  gap: 10px; 
+  align-items: center;
+  /* margin-top: 15px; */
+
+}
+
+.resume-upload-container span{
+
+  font-size: 18px;
+  font-weight: 600;
+  color: #4682B4 ;
+  font-family: sans-serif;
+
+}
+
+
+.linkedin-lazyapply-button{
+  background: linear-gradient(45deg, #f76b1c, #fbbf24, #e1f512) !important;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 25px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  /* margin-top: 5px; */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3), 0 10px 20px rgba(0, 0, 0, 0.2);
+  margin-left: 10px;
+  margin-bottom: 0;
+
+} 
+
+
+.linkedin-lazyapply-button:hover {
+  background: linear-gradient(45deg, #e1f512, #fbbf24, #f76b1c) !important; 
+}
+.draggable-box {
+    width: 100px;
+    height: 80px;
+    background-color: #3498db;
+    position: fixed;
+    top: 150px;
+    right: 0;
+    transform: translate(50%, -50%);
+    cursor: grab;
+    transition: transform 0.3s ease-in-out;
+    border-radius:5px 0 0 5px;
+    z-index: 11100000;
+  }
+  
+  .draggable-box:active {
+    cursor: grabbing;
+  }
+  
+  /* Add styling to make the div look like a draggable bar */
+  .draggable-box::before {
+    content: "";
+    display: block;
+    width: 2px;
+    height: 30px;
+    background-color: white;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 1px;
+  }
+  
+/* Modal Container */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.lazyapplymodal {
+  position: absolute;
+  top:50%;
+  left:50%;
+  translate:transform(-50%,-50%)
+}
+
+.open {
+  display: flex;
+}
+
+.closed {
+  display: none;
+}
+
+/* Modal Box */
+.modal-box {
+  background-color: #fff;
+  width: 70%;
+  max-width: 400px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Modal Title Bar */
+.modal-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f0f0f0;
+  padding: 10px 20px;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+.modal-title-bar h2 {
+  margin: 0;
+}
+
+.modal-close-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* Modal Content */
+.modal-content {
+  padding: 20px;
+}
+
+.control-card {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 500px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 2147483647;
+  font-size: 14px;
+  user-select: none;
+}
+
+/* When shown as a popover the element enters the top layer (above modal
+   <dialog>s). Reset the popover UA styles so our fixed positioning wins. */
+#main-automation-control-div.control-card {
+  inset: auto;
+  top: 20px;
+  right: 20px;
+  margin: 0;
+  border: none;
+  overflow: visible;
+}
+
+/* Collapsed State */
+.collapsed {
+  width: auto;
+  padding: 12px;
+  background-color: #fff;
+  cursor: pointer;
+}
+
+.collapsed-view {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expand-icon {
+  font-size: 18px;
+  color: #666;
+}
+
+/* Drag Handle */
+.drag-handle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  cursor: move;
+}
+
+.drag-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drag-line {
+  width: 30px;
+  height: 4px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+}
+
+.collapse-button {
+  cursor: pointer;
+  font-size: 24px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+/* Progress Section */
+.progress-container {
+  margin-bottom: 24px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #666;
+  margin-top: 5px;
+}
+
+.progress-header-1 {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  margin-bottom: 25px;
+  gap: 12px;
+  line-height: 30px !important;
+}
+
+.progress-header-1 span {
+  padding: 5px !important;
+  font-size: 16px;
+  font-weight: 500;
+  color: #2d2d2d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.progress-header-1 span:nth-child(2) {
+  background-color: #f8f9fa !important;
+  text-align: center !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: "8px 16px";
+  flex-shrink: 0;
+}
+
+.error-message-automationcontrol {
+  font-size: 16px;
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+.success-message-automationcontrol {
+  font-size: 16px;
+  color: #007bff;
+  font-weight: bold;
+  margin: 10px 0px;
+  text-align: left;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 15px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Controls Section */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 20px;
+  margin-top: 5px;
+  gap: 60px;
+}
+
+.play-button {
+  min-width: 90px;
+  height: 45px;
+  background-color: #2d2d2d;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.play-button:hover {
+  background-color: #404040;
+}
+
+/* Speed Control */
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.speed-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+}
+
+.speed-circles {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.speed-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.speed-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #e0e0e0;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.speed-circle:hover {
+  border-color: #2d2d2d;
+}
+
+.speed-circle.active {
+  background-color: #2d2d2d;
+  border-color: #2d2d2d;
+}
+
+.speed-text {
+  font-size: 14px;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.speed-circle.active .speed-text {
+  color: #fff;
+}
+
+/* Status */
+.status {
+  font-size: 15px;
+  color: #666;
+  margin-top: 24px;
+}
+
+
+.button-container {
+  display: flex;
+  gap: 20px;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.control-button {
+  height: 40px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  min-width: 90px;
+  font-size: 18px;
+}
+
+.quit-button {
+  background-color: #000;
+  color: white;
+}
+
+.quit-button:hover {
+  background-color: #404040;
+}
+
+.skip-button {
+  border-color: #666;
+  color: #666;
+  border: 1px solid rgba(45, 45, 45, 0.2);
+}
+
+.skip-button:hover {
+  border-color: #2D2D2D;
+  background-color: rgba(45, 45, 45, 0.04);
+}
+
+.pause-button {
+  background-color: #f0ad4e; /* orange */
+  color: white;
+}
+
+.resume-button {
+  background-color: #5cb85c; /* green */
+  color: white;
+}
+
+.job-counter {
+  font-size: 0.85em;
+  background-color: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #555;
+}
+
+/* Question Section Styles */
+.question-section {
+  margin-top: 20px;
+  padding: 15px 20px;
+  background-color: #f6f9ff;
+  border-radius: 8px;
+}
+
+.question-heading {
+  font-weight: 600;
+  color: #3478F6;
+  font-size: 17px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.question-content {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.question-text {
+  font-weight: 600;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.copy-button {
+  padding: 6px;
+  margin-left: 8px;
+  color: #3478F6;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.copy-button:hover {
+  background-color: rgba(52, 120, 246, 0.1);
+}
+
+.copy-button.copied {
+  color: #4CAF50;
+}
+
+.tweet-link {
+  display: flex;
+  align-items: center;
+  color: #3478F6;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 16px;
+  margin-bottom: 12px;
+  margin-top: 14px;
+}
+
+.tweet-link:hover {
+  text-decoration: underline;
+}
+
+.question-navigation {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.nav-link {
+  color: #666;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 550;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.nav-link:hover {
+  text-decoration: underline;
+  color: #3478F6;
+}
+
+.nav-next {
+  color: #3478F6;
+}
+
+.nav-count {
+  color: #2d2d2d;
+  font-size: 14px;
+}
+
+.icon-copy, .icon-check {
+  font-size: 17px;
+  display: inline-block;
+}
+
+.icon-copy::before {
+  content: "📋 COPY";
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.icon-check::before {
+  content: "✓";
+}

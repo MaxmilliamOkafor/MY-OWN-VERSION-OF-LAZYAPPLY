@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LazyApply Debugger</title>
+<style>
+  :root{--bg:#121212;--panel:#1a1a1a;--panel2:#202020;--line:#2c2c2c;--text:#e8e8e8;--muted:#9a9a9a;--accent:#9cc9ff;--ok:#3ddc84;--warn:#f5a623;--err:#ff6b6b;--debug:#6f6f6f;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.45 Roboto,"Segoe UI",Arial,sans-serif}
+  button,select,input{font:inherit;color:inherit}
+  button{background:#262626;border:1px solid #363636;border-radius:6px;padding:6px 11px;cursor:pointer}
+  button:hover{background:#303030}
+  button.primary{background:#1f3a5c;border-color:#2d5582}
+  button.danger{color:var(--err)}
+  select,input[type=search]{background:#1f1f1f;border:1px solid #363636;border-radius:6px;padding:5px 8px}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:#161616;position:sticky;top:0;z-index:5}
+  header h1{font-size:16px;margin:0 12px 0 0;font-weight:600}
+  .rec{display:flex;align-items:center;gap:6px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .grow{flex:1}
+  .menu{position:relative}
+  .menu .list{display:none;position:absolute;right:0;top:110%;background:#202020;border:1px solid #363636;border-radius:8px;min-width:260px;padding:6px;z-index:9}
+  .menu.open .list{display:block}
+  .menu .list button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px}
+  .menu .list button:hover{background:#2c2c2c}
+  .menu .list label{display:flex;gap:8px;padding:8px 10px;color:var(--muted);border-top:1px solid var(--line);margin-top:4px}
+  main{display:grid;grid-template-columns:260px minmax(0,1fr);height:calc(100% - 53px)}
+  aside{border-right:1px solid var(--line);overflow:auto;padding:10px}
+  aside h2,section h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:6px 4px 8px;font-weight:600}
+  .sess{padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:4px;border:1px solid transparent}
+  .sess:hover{background:#1e1e1e}
+  .sess.on{background:#1d2a3a;border-color:#2d4766}
+  .sess .t{font-weight:500}
+  .sess .s{color:var(--muted);font-size:12px}
+  #content{overflow:auto;padding:12px 16px 40px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:14px 16px;margin-bottom:14px}
+  .card h3{margin:0 0 8px;font-size:15px}
+  .muted{color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  .chip{border:1px solid #363636;border-radius:20px;padding:3px 10px;font-size:12px;background:#1f1f1f;cursor:pointer;user-select:none}
+  .chip.off{opacity:.38}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:110px}
+  .stat b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+  .stat span{font-size:12px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:6px 8px;border-top:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  tr.job{cursor:pointer}
+  tr.job:hover td{background:#1e1e1e}
+  tr.job.on td{background:#1d2a3a}
+  .cause{font-size:12.5px}
+  .num{font-variant-numeric:tabular-nums;text-align:right}
+  .tl{font-family:var(--mono);font-size:12px}
+  .row{display:grid;grid-template-columns:92px 54px 14px 72px 46px minmax(0,1fr);gap:8px;padding:3px 6px;border-top:1px solid #1f1f1f;cursor:pointer;align-items:start}
+  .row:hover{background:#1c1c1c}
+  .row.sel{background:#1d2a3a}
+  .row .m{white-space:pre-wrap;word-break:break-word}
+  .row.error .m{color:#ffb3b3}
+  .row.warn .m{color:#ffd79a}
+  .row.debug .m{color:#a0a0a0}
+  .cat{color:var(--accent)}
+  .detail{position:sticky;bottom:0;background:#171717;border:1px solid #333;border-radius:9px;margin-top:10px;max-height:46vh;overflow:auto;padding:12px}
+  pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px}
+  .why li{margin:3px 0}
+  .bad{color:var(--err)} .okc{color:var(--ok)} .wc{color:var(--warn)}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+  .empty{color:var(--muted);padding:30px;text-align:center}
+  .small{font-size:12px}
+  a{color:var(--accent)}
+  @media (max-width:800px){main{grid-template-columns:1fr}aside{max-height:30vh;border-right:0;border-bottom:1px solid var(--line)}.row{grid-template-columns:70px 12px 60px minmax(0,1fr)}.row .d,.row .j{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>LazyApply Debugger</h1>
+  <span class="rec"><span class="dot" id="recDot"></span><span id="recText">…</span></span>
+  <select id="level" title="How much is recorded">
+    <option value="full">Record everything</option>
+    <option value="standard">Record all but console chatter</option>
+    <option value="errors">Record errors and outcomes only</option>
+  </select>
+  <button id="recToggle"></button>
+  <span class="grow"></span>
+  <span class="muted small" id="count"></span>
+  <button id="snap" title="Record what each automation tab shows right now">Snapshot now</button>
+  <label class="rec small"><input type="checkbox" id="live" checked> Live</label>
+  <div class="menu" id="exportMenu">
+    <button class="primary" id="exportBtn">Export ▾</button>
+    <div class="list">
+      <button data-x="md">Fix report (.md): causes, errors, last steps of each job</button>
+      <button data-x="json">Selected session, every event (.json)</button>
+      <button data-x="all">Everything recorded (.json)</button>
+      <label><input type="checkbox" id="mask" checked> Hide personal details (emails, phone numbers, your name, profile links)</label>
+    </div>
+  </div>
+  <button class="danger" id="clear">Clear</button>
+</header>
+<main>
+  <aside>
+    <h2>Runs</h2>
+    <div id="runs"></div>
+    <h2 style="margin-top:16px">Other activity (search, dashboard, pages)</h2>
+    <div id="days"></div>
+  </aside>
+  <div id="content"><div class="empty">Loading…</div></div>
+</main>
+<script src="debugCore.js"></script>
+<script src="runReport.js"></script>
+<script src="debugger.js"></script>
+</body>
+</html>
