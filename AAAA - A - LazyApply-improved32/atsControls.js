@@ -151,6 +151,78 @@
     else el.value = v;
   };
 
+  // ---- "Other" for a school / field of study the list does not have --------
+  // Workday's school and field-of-study lists are the employer's own, so a
+  // school is often missing (Imperial College London on a Spanish list). The
+  // search then picked nothing, the required field stayed empty and the job
+  // was left as stuck. If the list has an "Other" entry it is picked instead,
+  // which is true: the school is not in their list.
+  const OTHER_FIELD = /school|university|college|institution|field of study|discipline|major|area of study/i;
+  function fieldLabel(input) {
+    if (!input) return "";
+    const ids = (input.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
+    const byId = ids.map((i) => textOf(document.getElementById(i))).join(" ");
+    if (byId.trim()) return byId;
+    const box = input.closest('[data-automation-id^="formField"], [data-fkit-id], fieldset, [role="group"]');
+    const lab = box && box.querySelector("label, legend");
+    return textOf(lab) || input.getAttribute("aria-label") || input.id || "";
+  }
+  function hasSelection(input) {
+    const id = input.getAttribute("data-uxi-multiselect-id");
+    if (id && document.querySelector('li[data-uxi-multiselect-id="' + id + '"]')) return true;
+    const box = input.closest('[data-automation-id^="formField"], [data-automation-id="multiSelectContainer"], [data-fkit-id]') || input.parentElement;
+    return !!(box && box.querySelector('[data-automation-id="selectedItem"], [data-automation-id="selectedItemList"] li'));
+  }
+  async function waitOptions(ms) {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      const list = document.querySelector('div[role="listbox"]');
+      const opts = list ? list.querySelectorAll('div[role="option"]') : [];
+      if (opts.length) return Array.from(opts);
+      await sleep(150);
+    }
+    return [];
+  }
+  function press(el, key, code) {
+    for (const t of ["keydown", "keypress", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key, code, keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+  }
+  function clickOption(opt) {
+    const t = opt.querySelector('[data-uxi-widget-type="multiselectlistitem"]') || opt;
+    for (const e of ["mouseover", "mousedown", "mouseup", "click"]) t.dispatchEvent(new MouseEvent(e, { bubbles: true, cancelable: true, view: window }));
+  }
+  /** After a search list was tried: pick "Other" when nothing was chosen. */
+  async function searchOther(input) {
+    try {
+      if (!input || !input.isConnected || hasSelection(input)) return false;
+      const label = fieldLabel(input);
+      if (!OTHER_FIELD.test(label)) return false;
+      input.focus();
+      nativeSet(input, "");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      nativeSet(input, "Other");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(400);
+      press(input, "Enter", "Enter");
+      const opts = await waitOptions(4000);
+      const other = opts.find((o) => /^other$/i.test(textOf(o))) || opts.find((o) => /^other\b/i.test(textOf(o))) || opts.find((o) => /\bnot (listed|found|on (the|this) list)\b/i.test(textOf(o)));
+      if (other) {
+        clickOption(other);
+        await sleep(600);
+        try {
+          if (self.__lazyDbg) self.__lazyDbg.log("field", "info", '"' + label.slice(0, 60) + '": not in this employer\'s list, picked "' + textOf(other) + '"');
+        } catch (e) {}
+        return true;
+      }
+      // No "Other" in this list: leave the box empty again.
+      nativeSet(input, "");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      escapeKey(input);
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /** Set a Workday date part (month/day/year spin box) so React keeps it. */
   async function setSpin(seg, value) {
     if (!seg) return false;
@@ -688,5 +760,5 @@
     } catch (e) {}
   }
 
-  g.__lazyAts = { jobSubmitted, rememberProfile, referralInfo, pageNotFound, applyRetry, applyWait, pageJobMeta, jobMetaFromText, jobMetaFromLd, ownMail, emailGate, emailOutcome, emailLog, jobIdFromText, jobIdFromLd, pageJobId, captureJobId, findPeopleFetch, accountPassword, workdayAccount, saveWorkdayAccount, icimsFallback, norm, similarity, matchIndex, bestNode, sharesWord, closeList, setSpin, setDateParts, submittedMark, textOf, version: 1 };
+  g.__lazyAts = { jobSubmitted, rememberProfile, referralInfo, pageNotFound, applyRetry, applyWait, pageJobMeta, jobMetaFromText, jobMetaFromLd, ownMail, emailGate, emailOutcome, emailLog, jobIdFromText, jobIdFromLd, pageJobId, captureJobId, findPeopleFetch, accountPassword, workdayAccount, saveWorkdayAccount, icimsFallback, norm, similarity, matchIndex, bestNode, sharesWord, closeList, setSpin, setDateParts, submittedMark, textOf, searchOther, version: 1 };
 })();

@@ -2169,6 +2169,78 @@ extension.updateUserAgent = function (string, stringmain) {
   });
 };
 
+// The dashboard tab is the LazyApply page that sent the message. Guessing
+// "whatever tab is active" used to pick a chrome:// tab now and then, which
+// left globalTabId empty, so the end-of-run results never reached the
+// dashboard and it stayed on "Automation in Progress" for ever.
+const DASH_URL_PATTERNS = [
+  "https://app.lazyapply.com/*",
+  "https://beta.lazyapply.com/*",
+];
+const isDashUrl = (u) =>
+  /^https:\/\/(app|beta)\.lazyapply\.com\//.test(String(u || ""));
+const dashTabFromSender = (sender) => {
+  const tab = sender && sender.tab;
+  if (!tab || tab.id == null || tab.id < 0) return null;
+  return isDashUrl(tab.url || sender.url) ? tab.id : null;
+};
+const resolveDashboardTabId = async (sender) => {
+  const id = dashTabFromSender(sender);
+  return id != null ? id : waitForTabId();
+};
+
+// The saved dashboard tab first, then any other open LazyApply tab,
+// most recently used first.
+async function dashboardTabCandidates(preferredId) {
+  const ids = [];
+  if (preferredId != null && preferredId !== "") {
+    try {
+      const t = await chrome.tabs.get(Number(preferredId));
+      if (t && isDashUrl(t.url)) ids.push(t.id);
+    } catch (e) {}
+  }
+  try {
+    const tabs = await chrome.tabs.query({ url: DASH_URL_PATTERNS });
+    tabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+    for (const t of tabs) if (!ids.includes(t.id)) ids.push(t.id);
+  } catch (e) {}
+  return ids;
+}
+
+// Sends a message to one dashboard tab. "answered": the Jobs page took it;
+// "noReceiver": the page bridge (globalDash) is missing; "silent": the page
+// got it but did not answer (another dashboard page, e.g. Profile).
+function sendToDashboardTab(tabId, message, waitMs) {
+  const sent = chrome.tabs.sendMessage(Number(tabId), message);
+  return Promise.race([
+    sent.then(
+      () => "answered",
+      () => "noReceiver"
+    ),
+    new Promise((resolve) => setTimeout(() => resolve("silent"), waitMs)),
+  ]);
+}
+
+// Delivers the run results to the dashboard; returns the tab that took them.
+async function deliverToDashboard(preferredId, message) {
+  const candidates = (await dashboardTabCandidates(preferredId)).slice(0, 4);
+  for (const id of candidates) {
+    let how = await sendToDashboardTab(id, message, 5000);
+    if (how === "noReceiver") {
+      // The bridge was never injected into this tab: add it and try again.
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: id },
+          files: ["globalDash.bundle.js"],
+        });
+        how = await sendToDashboardTab(id, message, 5000);
+      } catch (e) {}
+    }
+    if (how === "answered") return id;
+  }
+  return null;
+}
+
 const waitForSetting = async (id) => {
   return new Promise((resolve, reject) => {
     // globalTabId = id;
@@ -2260,28 +2332,19 @@ async function handleAutomationComplete(tabId) {
 
   // Send results to React app using chrome.tabs.sendMessage
 
-  if (state.globalTabId) {
+  // The dashboard only answers while its Jobs page is open. On any other
+  // page (Profile, Email Settings) the answer never comes, so each try is
+  // capped and the last job's tab is closed either way. globalTabId can be
+  // empty or stale, so any open LazyApply tab is tried too.
+  const dashTab = await deliverToDashboard(state.globalTabId, results);
+  if (dashTab == null) {
+    console.log("Could not send results to the dashboard - no tab answered");
+    await chrome.storage.local.set({ lastAutomationResults: results });
+  }
+  const focusTab = dashTab != null ? dashTab : state.globalTabId;
+  if (focusTab != null && focusTab !== "") {
     try {
-      // The dashboard only answers while its Jobs page is open. On any other
-      // page (Profile, Email Settings) the answer never comes, which used to
-      // leave the last job's tab open for ever with "moving to next job".
-      const sent = chrome.tabs.sendMessage(Number(state.globalTabId), results);
-      sent.catch(() => {});
-      const delivered = await Promise.race([
-        sent.then(() => true),
-        new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
-      ]);
-      if (!delivered) throw new Error("dashboard did not answer");
-    } catch (error) {
-      console.log(
-        "Could not send results to React app tab - tab might be closed or refreshed"
-      );
-      await chrome.storage.local.set({ lastAutomationResults: results });
-    }
-    try {
-      await chrome.tabs.update(Number(state.globalTabId), {
-        active: true,
-      });
+      await chrome.tabs.update(Number(focusTab), { active: true });
     } catch (error) {
       console.log("Could not focus the dashboard tab");
     }
@@ -2331,25 +2394,18 @@ async function handleAutomationInterrupted(state) {
     },
   };
 
-  // Send results to React app
-  if (globalTabId.globalTabId) {
-    try {
-      await chrome.tabs.sendMessage(Number(globalTabId.globalTabId), results);
-    } catch (error) {
-      console.log(
-        "Could not send interrupted status to React app tab - tab might be closed or refreshed"
-      );
-      // Optionally store the interrupted state
-      await chrome.storage.local.set({ lastAutomationResults: results });
-    }
+  // Send results to React app (same tab search as a finished run)
+  const dashTab = await deliverToDashboard(globalTabId.globalTabId, results);
+  if (dashTab == null) {
+    console.log("Could not send interrupted status to the dashboard");
+    await chrome.storage.local.set({ lastAutomationResults: results });
   }
 
-  // focus on global tab id
-  if (globalTabId.globalTabId)
+  // focus on the dashboard tab
+  const focusTab = dashTab != null ? dashTab : globalTabId.globalTabId;
+  if (focusTab != null && focusTab !== "")
     try {
-      await chrome.tabs.update(Number(globalTabId.globalTabId), {
-        active: true,
-      });
+      await chrome.tabs.update(Number(focusTab), { active: true });
     } catch (err) {
       console.log("err", err);
     }
@@ -2530,7 +2586,7 @@ chrome.runtime.onMessageExternal.addListener(function (
     if (request.message == "check") {
       console.log("execute script", request?.injected);
       if ("injected" in request && !request.injected) {
-        waitForTabId().then((id) => {
+        resolveDashboardTabId(sender).then((id) => {
           executeScripts(id, [{ file: "globalDash.bundle.js" }]);
           sendResponse({ status: "installed" });
         });
@@ -2569,7 +2625,7 @@ chrome.runtime.onMessageExternal.addListener(function (
             sendResponse({ message: "tokenSavedInitial" });
           }
           if (request.message == "loginToken") {
-            const id = await waitForTabId();
+            const id = await resolveDashboardTabId(sender);
             if (id != -1) {
               if ("injected" in request && !request.injected) {
                 executeScripts(id, [{ file: "globalDash.bundle.js" }]);
@@ -3008,7 +3064,7 @@ chrome.runtime.onMessageExternal.addListener(function (
       if ("global" in request) {
         if (request.message == "currentTabId") {
           console.log("currenttabid");
-          waitForTabId().then(async (id) => {
+          resolveDashboardTabId(sender).then(async (id) => {
             if (id != -1) {
               console.log("tabid", id);
               await waitForSetting(id);
@@ -3437,6 +3493,12 @@ chrome.runtime.onMessageExternal.addListener(function (
     }
   } else if (request.type === "START_AUTOMATION") {
     console.log("helloooo");
+
+    // The tab that pressed Start is the one waiting for the results.
+    const startDashTab = dashTabFromSender(sender);
+    if (startDashTab != null) {
+      chrome.storage.local.set({ globalTabId: startDashTab });
+    }
 
     const links = request.data.map((job) => ({
       companyName: job.companyName,

@@ -12,8 +12,19 @@
  *  - visa sponsorship needed: from the profile's visa requirement;
  *  - willing to relocate: from the profile;
  *  - available for the job's hybrid / office days: Yes (the job states it and
- *    the user chose to apply).
+ *    the user chose to apply);
+ *  - County / State / Province of the address: the profile's state;
+ *  - name Prefix (Mr / Ms): from the profile's gender, else left alone;
+ *  - "Have you (ever) worked for / been an employee of <Company>?": Yes only
+ *    when <Company> is in the profile's work history, else No. Only when
+ *    the question names the company; relatives, referrals and earlier
+ *    applications are not touched;
+ *  - "How did you hear about us?": a job-board / website / other option,
+ *    only when the AI's answer matches none of the options.
  * Every answer is then matched to the exact option text ("Yes" -> "Yes, I am").
+ *
+ * Optional name / address fields (middle name, address line 2, extension,
+ * suffix) are no longer filled with "NA" / "N/A": they are left empty.
  *
  * Copied into atsAutomation.bundle.js (LAZY_ANSWER_FIX markers); loaded on its
  * own by the tests.
@@ -108,6 +119,65 @@
   const NOTICE = /\b(privacy|personal data|data protection|gdpr|your data|data policy|acknowledge|confirm|consent|terms|notice)\b/;
   const ACK_OPT = /^(i )?(acknowledge|confirm|agree|accept|consent|understand|yes|ok)\b|acknowledge|confirm/;
 
+  // ---- Address region / prefix / past employer / source --------------------
+  const REGION_Q = /^(county|state|province|region|state province|state or province|state region|county region|prefecture|territory)$/;
+  const regionKey = (s) => norm(s).replace(/\b(county|co|state of|province of|province|region|city of)\b/g, " ").replace(/\s+/g, " ").trim();
+  function regionOption(opts, profile) {
+    const p = personal(profile);
+    const wants = [p.state, p.county, p.region, p.province].map(regionKey).filter(Boolean);
+    if (!wants.length) return null;
+    for (const w of wants) {
+      const hit = opts.find((o) => regionKey(o) === w);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  const PREFIX_Q = /^(prefix|title|salutation|name prefix|honorific)$/;
+  function prefixOption(opts, profile) {
+    const g = norm(personal(profile).gender || misc(profile).gender);
+    const order = g === "male" || g === "man" ? ["mr"] : g === "female" || g === "woman" ? ["ms", "mrs", "miss"] : [];
+    for (const w of order) {
+      const hit = opts.find((o) => norm(o).replace(/\s+/g, "") === w);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  const NOT_EMPLOYER_Q = /\b(relative|relatives|family|spouse|partner|reseller|customer|client|vendor|supplier|friend|know anyone|referr|refer|applied|interview|government|public sector|military|competitor|non ?compete|restrict|agreement|clearance)\b/;
+  // The company named right after "worked at / for", "employee of" or in
+  // "a <Company> employee" (capitalised, so "working with Python" is not one).
+  const NAME = "([A-Z][\\w&.'’-]*(?:\\s+(?:[A-Z][\\w&.'’-]*|&))*)";
+  const ART = "(?:(?:the|a|an|either)\\s+)?";
+  const EMP_AT = new RegExp(
+    "\\b(?:work(?:ed|ing)?|employed|contracted|interned)\\s+(?:at|for|by)(?:\\s+or\\s+(?:at|for|by))?\\s+" + ART + NAME +
+      "|\\b(?:employee|team member|contractor|intern)\\s+(?:of|at)\\s+" + ART + NAME +
+      "|\\b(?:an?|current|former)\\s+([A-Z][\\w&.'’-]*(?:\\s+[A-Z][\\w&.'’-]*){0,3}?)\\s+(?:[Ee]mployee|[Tt]eam [Mm]ember|[Cc]ontractor)\\b"
+  );
+  const NOT_COMPANY = /^(any|our|this|the|a|an|us|you|your|company|organization|organisation|firm|group|employer|we|it|its)$/i;
+  function companyAsked(question) {
+    const m = EMP_AT.exec(String(question || ""));
+    const name = m && (m[1] || m[2] || m[3]);
+    if (!name) return "";
+    const n = norm(name).replace(/\b(inc|ltd|llc|plc|corp|corporation|company|group|gmbh|ag|sa)\b/g, " ").replace(/\s+/g, " ").trim();
+    return n && !NOT_COMPANY.test(n) && n.length >= 2 ? n : "";
+  }
+  function workedThere(profile, company) {
+    const list = (profile && profile.resume_data && profile.resume_data.workExperience) || [];
+    const key = (s) => norm(s).replace(/\b(inc|ltd|llc|plc|corp|corporation|company|group|gmbh|ag|sa)\b/g, " ").replace(/\s+/g, " ").trim();
+    return list.some((w) => {
+      const c = key(w && w.company && typeof w.company === "object" ? w.company.name || w.company.title : w && w.company);
+      return c && (c === company || (" " + c + " ").includes(" " + company + " ") || (" " + company + " ").includes(" " + c + " "));
+    });
+  }
+  const SOURCE_Q = /\b(how|where) did you (first )?(hear|learn|find out|come across)\b|\bsource\b|\breferral source\b/;
+  const SOURCE_OPTS = [/\bjob ?board\b|\bjob site\b|\bonline job\b/, /\b(company|career|careers|corporate) (web)?site\b|\bwebsite\b|\binternet\b|\bonline\b/, /^other\b/];
+  function sourceOption(opts) {
+    for (const re of SOURCE_OPTS) {
+      const hit = opts.find((o) => re.test(norm(o)));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
   /** Answer for one question, or null to leave it as it is. */
   function answerFor(q, profile, jobPlace) {
     const question = String((q && (q.question || q.label)) || "");
@@ -117,6 +187,9 @@
     const real = opts.filter((o) => !/^(select|select one|select an option|choose|please select|\-+)$/i.test(String(o).trim()));
     // 1. A notice whose only real option is "Acknowledge/Confirm".
     if (real.length === 1 && NOTICE.test(t) && ACK_OPT.test(norm(real[0]))) return real[0];
+    // Address region and name prefix: from the profile.
+    if (REGION_Q.test(t)) return regionOption(real, profile);
+    if (PREFIX_Q.test(t)) return prefixOption(real, profile);
     // 2. Work permit / passport / authorised to work: only from the profile.
     if (WORK_RIGHT.test(t) && !SPONSOR.test(t)) {
       const r = rights(profile);
@@ -151,7 +224,32 @@
     }
     // 5. Available for the job's hybrid / office arrangement.
     if (ARRANGEMENT.test(t) && WILLING.test(t)) return YES(opts) || null;
+    // 6. Worked for / employee of the named company: from the work history.
+    if (!NOT_EMPLOYER_Q.test(t) && YES(opts) && NO(opts)) {
+      const company = companyAsked(question);
+      if (company) return workedThere(profile, company) ? YES(opts) : NO(opts);
+    }
+    // 7. How did you hear about us.
+    if (SOURCE_Q.test(t)) return sourceOption(real);
     return null;
+  }
+
+  // Optional fields the AI fills with "NA": better left empty.
+  const OPTIONAL_TEXT = /\b(middle name|address line ?[23]|extension|suffix|preferred name|nickname|apartment|suite|address 2)\b/;
+  const FILLER = /^(n\/?a|na|none|null|nil|not applicable|-+|\.)$/i;
+  // Removes those questions from the list (in place) so they are not typed.
+  function dropFiller(questions) {
+    for (let i = questions.length - 1; i >= 0; i--) {
+      const q = questions[i];
+      if (!q || (Array.isArray(q.options) && q.options.length)) continue;
+      if (!/^(text|textarea)$/.test(String(q.type || "text"))) continue;
+      if (OPTIONAL_TEXT.test(norm(q.question)) && FILLER.test(String(q.answer == null ? "" : q.answer).trim())) {
+        try {
+          if (self.__lazyDbg) self.__lazyDbg.log("ai", "info", 'Left "' + String(q.question).slice(0, 80) + '" empty instead of "' + String(q.answer) + '"');
+        } catch (e) {}
+        questions.splice(i, 1);
+      }
+    }
   }
 
   function jobPlaceOnPage() {
@@ -169,6 +267,9 @@
    */
   function fix(questions, profile) {
     if (!Array.isArray(questions)) return questions;
+    try {
+      dropFiller(questions);
+    } catch (e) {}
     const place = jobPlaceOnPage();
     const dbg = (q, before, why) => {
       try {
@@ -184,7 +285,8 @@
         if (!q || !Array.isArray(q.options) || !q.options.length) continue;
         const ours = answerFor(q, profile, place);
         const opts = q.options.map((o) => (typeof o === "object" && o ? o.label || o.text || o.value : o));
-        if (ours && (WORK_RIGHT.test(norm(q.question)) || SPONSOR.test(norm(q.question)))) {
+        const tq = norm(q.question);
+        if (ours && (WORK_RIGHT.test(tq) || SPONSOR.test(tq) || REGION_Q.test(tq) || PREFIX_Q.test(tq))) {
           q.answer = ours; // the profile decides these, not the AI
           why = "from your profile";
           continue;
@@ -223,6 +325,6 @@
   const SENSITIVE = /\b(passport|work permit|right to work|authori[sz]|eligible to work|legally|visa|sponsor|citizen|clearance|veteran|disab|criminal|convict|felony|security vetting)/;
   const sensitive = (q) => SENSITIVE.test(norm(q && typeof q === "object" ? q.question : q));
 
-  g.__lazyAnswers = { fix, fixOne, answerFor, rights, pick, sensitive };
+  g.__lazyAnswers = { fix, fixOne, answerFor, rights, pick, sensitive, companyAsked, regionOption, prefixOption, dropFiller };
   if (typeof module !== "undefined" && module.exports) module.exports = g.__lazyAnswers;
 })(typeof self !== "undefined" ? self : globalThis);

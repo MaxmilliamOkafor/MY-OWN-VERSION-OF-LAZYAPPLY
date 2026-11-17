@@ -8,7 +8,15 @@
  * (entry 1 from the first job, entry 2 from the second, ...):
  *  - job title, company, location, from / to, description: from the profile;
  *  - school, degree, field of study, GPA, years: from the profile;
- *  - websites: each profile link once.
+ *  - websites: each profile link once;
+ *  - languages: entry 1 from the first profile language, entry 2 from the
+ *    second, ... with its level in the proficiency lists and "I am fluent"
+ *    ticked only for a native / fluent / advanced level. (Before, every
+ *    language entry got "English" and Workday refused the page with
+ *    "Duplicate language entries are not allowed".)
+ * Social profile questions ("Facebook profile URL") only get a link to that
+ * site from the profile, else they are left empty (the portfolio link used
+ * to go there and Workday refused it as an invalid Facebook URL).
  * A field the profile has no value for is left empty (never guessed), and
  * extra entries (more than the profile has, or duplicate websites) are
  * deleted. Nothing is made up: dates come only from the profile, and an entry
@@ -215,6 +223,114 @@
     }
   }
 
+  // ---- Languages ----------------------------------------------------------
+  // Profile languages: [{language, level}], each language once.
+  function languages(profile) {
+    const list = (profile && profile.resume_data && profile.resume_data.languages) || [];
+    const out = [];
+    const seen = new Set();
+    for (const l of list) {
+      const name = l && typeof l === "object" ? str(l.language || l.name) : str(l);
+      if (!name || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      out.push({ name, level: l && typeof l === "object" ? str(l.level || l.proficiency || l.fluency) : "" });
+    }
+    return out;
+  }
+  // 5 native, 4 fluent / advanced, 3 intermediate, 2 basic, 1 none.
+  const LEVELS = [
+    [5, /\b(native|bilingual|mother ?tongue|first language|c2)\b/],
+    [4, /\b(fluent|fluency|advanced|proficient|full professional|expert|excellent|c1)\b/],
+    [3, /\b(intermediate|professional working|working proficiency|conversational|good|b2|b1|moderate|competent)\b/],
+    [2, /\b(basic|beginner|elementary|limited|foundational|novice|a2|a1|fair)\b/],
+    [1, /\b(no proficiency|none)\b/],
+  ];
+  function levelRank(text) {
+    const t = str(text).toLowerCase();
+    if (!t) return 0;
+    for (const [r, re] of LEVELS) if (re.test(t)) return r;
+    const d = /^([1-5])\b/.exec(t); // "4 - ..." scales
+    return d ? +d[1] : 0;
+  }
+  const isFluent = (level) => levelRank(level) >= 4;
+  // The option matching the profile level: the same level, else the closest
+  // lower one (never claims more than the profile says), else the closest.
+  function levelOption(options, level) {
+    const want = levelRank(level);
+    if (!want || !Array.isArray(options)) return null;
+    const ranked = options
+      .map((o) => (typeof o === "object" && o ? o.label || o.text || o.value : o))
+      .filter((o) => o && !/^(select|select one|choose)/i.test(str(o)))
+      .map((o) => ({ o, r: levelRank(o) }))
+      .filter((x) => x.r);
+    if (!ranked.length) return null;
+    const same = ranked.find((x) => x.r === want);
+    if (same) return same.o;
+    const lower = ranked.filter((x) => x.r < want).sort((a, b) => b.r - a.r)[0];
+    if (lower) return lower.o;
+    return ranked.sort((a, b) => Math.abs(a.r - want) - Math.abs(b.r - want))[0].o;
+  }
+  // "language-57--language" -> "language-57" (Workday numbers keep growing,
+  // so the entry's place comes from the page order, not from the number).
+  const LANG_ID = /^(language-\d+)--/i;
+  const langPrefix = (el) => {
+    const m = el && el.id && LANG_ID.exec(el.id);
+    return m ? m[1].toLowerCase() : "";
+  };
+  function langEntryOf(el) {
+    const pre = langPrefix(el);
+    if (!pre) return null;
+    const doc = el.ownerDocument || (typeof document !== "undefined" ? document : null);
+    const order = [];
+    if (doc) {
+      for (const x of doc.querySelectorAll('[id^="language-"]')) {
+        const p = langPrefix(x);
+        if (p && !order.includes(p)) order.push(p);
+      }
+    }
+    let index = order.indexOf(pre);
+    if (index < 0) index = 0;
+    // The entry panel: the widest box around it holding only this entry.
+    let group = null;
+    for (let n = el.parentElement; n && (!doc || n !== doc.body); n = n.parentElement) {
+      const others = Array.from(n.querySelectorAll('[id^="language-"]')).some((x) => langPrefix(x) && langPrefix(x) !== pre);
+      if (others) break;
+      group = n;
+    }
+    return { kind: "lang", index, group: group || el.parentElement, prefix: pre };
+  }
+  function langField(el, question) {
+    if (/--language$/i.test(el.id || "")) return "language";
+    if ((el.type || "").toLowerCase() === "checkbox" || /fluent in this language/i.test(str(question))) return "fluent";
+    return "level";
+  }
+
+  // ---- Social profile links -----------------------------------------------
+  const SOCIAL = [
+    ["facebook", /facebook/i, /(^|\.)facebook\.com$|(^|\.)fb\.com$/i],
+    ["twitter", /twitter|\bx\.com\b|\bx profile\b/i, /(^|\.)(twitter|x)\.com$/i],
+    ["instagram", /instagram/i, /(^|\.)instagram\.com$/i],
+    ["github", /github/i, /(^|\.)github\.com$/i],
+    ["linkedin", /linked ?in/i, /(^|\.)linkedin\.com$/i],
+  ];
+  const hostOf = (u) => {
+    try {
+      return new URL(str(u)).hostname.toLowerCase();
+    } catch (e) {
+      return "";
+    }
+  };
+  // For a "Facebook / Twitter / ... profile" question: the profile's link to
+  // that site, "" when it has none, or null when the question is not one.
+  function socialLink(question, profile) {
+    const q = str(question);
+    if (!/\b(url|link|profile|handle|page|account)\b/i.test(q)) return null;
+    const hits = SOCIAL.filter(([, re]) => re.test(q));
+    if (hits.length !== 1) return null;
+    const host = hits[0][2];
+    return links(profile).find((u) => host.test(hostOf(u))) || "";
+  }
+
   function clickDelete(group) {
     const b =
       group.querySelector('button[data-automation-id="panel-set-delete-button"]') ||
@@ -237,12 +353,55 @@
     const W = jobs(profile);
     const E = schools(profile);
     const L = links(profile);
+    const LG = languages(profile);
     const keep = [];
     const extra = new Set(); // groups to delete
+    let langSet = 0;
     for (const q of questions) {
       const el = q && (q.element || (q.checkboxOptions && q.checkboxOptions[0]) || (q.radioOptions && q.radioOptions[0]));
+      const lang = langEntryOf(el);
+      if (lang) {
+        if (!LG.length) {
+          keep.push(q); // no languages in the profile: leave the page as it was
+          continue;
+        }
+        if (lang.index >= LG.length) {
+          extra.add(lang.group);
+          continue;
+        }
+        const want = LG[lang.index];
+        const field = langField(el, q.question);
+        if (field === "language") {
+          q.answer = want.name;
+        } else if (field === "fluent") {
+          const box = q.checkboxOptions && q.checkboxOptions[0];
+          if (box && !!box.checked !== isFluent(want.level)) {
+            try {
+              box.click();
+            } catch (e) {}
+          }
+          continue; // ticked (or not) here, not by the AI answer
+        } else {
+          const opt = levelOption(q.options, want.level);
+          if (!opt) {
+            keep.push(q); // level unknown or no option matches: AI answer kept
+            continue;
+          }
+          q.answer = opt;
+        }
+        q.__lazyFromProfile = true;
+        langSet++;
+        keep.push(q);
+        continue;
+      }
       const at = entryOf(el);
       if (!at) {
+        const social = socialLink(q && q.question, profile);
+        if (social === "") continue; // no link to that site: left empty
+        if (social) {
+          q.answer = social;
+          q.__lazyFromProfile = true;
+        }
         keep.push(q);
         continue;
       }
@@ -292,7 +451,7 @@
       keep.push(q);
     }
     try {
-      if (self.__lazyDbg) self.__lazyDbg.log("field", "info", "Workday My Experience: " + questions.filter((q) => q && q.__lazyFromProfile).length + " fields set from your profile (" + W.length + " jobs, " + E.length + " schools, " + L.length + " links), " + extra.size + " extra entries removed, " + (questions.length - keep.length) + " fields left empty");
+      if (self.__lazyDbg) self.__lazyDbg.log("field", "info", "Workday My Experience: " + questions.filter((q) => q && q.__lazyFromProfile).length + " fields set from your profile (" + W.length + " jobs, " + E.length + " schools, " + L.length + " links, " + LG.length + " languages, " + langSet + " language fields), " + extra.size + " extra entries removed, " + (questions.length - keep.length) + " fields left empty");
     } catch (e) {}
     // Extra entries are removed, last first so the others keep their place.
     Array.from(extra)
@@ -305,6 +464,6 @@
     return keep;
   }
 
-  g.__lazyWdSections = { fix, isCurrentGroup, parseDate, links, fieldOfStudy, entryOf, fieldOf, mmYYYY };
+  g.__lazyWdSections = { fix, isCurrentGroup, parseDate, links, fieldOfStudy, entryOf, fieldOf, mmYYYY, languages, levelRank, levelOption, langEntryOf, socialLink };
   if (typeof module !== "undefined" && module.exports) module.exports = g.__lazyWdSections;
 })(typeof self !== "undefined" ? self : globalThis);
