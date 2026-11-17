@@ -117,7 +117,10 @@
   const ARRANGEMENT = /\b(hybrid|in office|in the office|on ?site|onsite|days (a|per) week in|office days|days in (the )?office|commute|work from (our|the) office)\b/;
   const WILLING = /\b(happy|willing|able|available|comfortable|open|okay|ok|agree)\b/;
   const NOTICE = /\b(privacy|personal data|data protection|gdpr|your data|data policy|acknowledge|confirm|consent|terms|notice)\b/;
-  const ACK_OPT = /^(i )?(acknowledge|confirm|agree|accept|consent|understand|yes|ok)\b|acknowledge|confirm/;
+  const MARKETING = /\b(whatsapp|sms|text messages?|newsletter|marketing|talent (community|pool)|future (opportunities|roles|vacancies)|job alerts?)\b/;
+  const AGREE_OPT = /^(yes\b|i (have read|acknowledge|agree|accept|consent|confirm|understand)|agree|accept|acknowledge|confirm)/;
+  const REFUSE_OPT = /\b(not|don'?t|do not|decline|disagree|refuse|withdraw)\b|^no\b/;
+  const ACK_OPT =/^(i )?(acknowledge|confirm|agree|accept|consent|understand|yes|ok)\b|acknowledge|confirm/;
 
   // ---- Address region / prefix / past employer / source --------------------
   const REGION_Q = /^(county|state|province|region|state province|state or province|state region|county region|prefecture|territory)$/;
@@ -187,6 +190,12 @@
     const real = opts.filter((o) => !/^(select|select one|select an option|choose|please select|\-+)$/i.test(String(o).trim()));
     // 1. A notice whose only real option is "Acknowledge/Confirm".
     if (real.length === 1 && NOTICE.test(t) && ACK_OPT.test(norm(real[0]))) return real[0];
+    // A privacy / terms notice with "I agree" and "I do not agree" style options:
+    // agreeing is required to apply. (Not marketing: WhatsApp, newsletters...)
+    if (NOTICE.test(t) && !MARKETING.test(t)) {
+      const yes = real.filter((o) => AGREE_OPT.test(norm(o)) && !REFUSE_OPT.test(norm(o)));
+      if (yes.length === 1 && real.length <= 4) return yes[0];
+    }
     // Address region and name prefix: from the profile.
     if (REGION_Q.test(t)) return regionOption(real, profile);
     if (PREFIX_Q.test(t)) return prefixOption(real, profile);

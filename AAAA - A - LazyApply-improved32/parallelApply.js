@@ -437,7 +437,21 @@
       g.executeScripts(tabId, [{ file: "jquery.min.js" }, { file: "inject-autofill-template.js" }, { file: "autoFillTemplate.bundle.js" }]);
     }
     if (/^about:/i.test(tab.url)) return true;
-    if (!g.isUrlInAllowedPatterns(tab.url)) {
+    if (!g.isUrlInAllowedPatterns(tab.url) && g.isWorkdaySubmittedUrl && g.isWorkdaySubmittedUrl(tab.url)) {
+      // Workday's "submitted" page: the job was applied to, not skipped.
+      const idx = run.workers[tabId].idx;
+      if (run.workers[tabId].submittedIdx === idx) return true;
+      run.workers[tabId].submittedIdx = idx;
+      setTimeout(async () => {
+        try {
+          await serial(async () => {
+            if (!run || !run.workers[tabId] || run.workers[tabId].idx !== idx) return;
+            await g.recordWorkdaySubmitted(wkey("applicationState", tabId), idx, wkey("pendingAnalytics", tabId));
+            await finishJob(tabId, { status: "completed" });
+          });
+        } catch (e) {}
+      }, 12000); // the application script checks for 10 s and may record it itself
+    } else if (!g.isUrlInAllowedPatterns(tab.url)) {
       const url = tab.url;
       const idx = run.workers[tabId].idx;
       setTimeout(async () => {

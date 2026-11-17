@@ -1103,6 +1103,80 @@ async function checkJobTimeout() {
 
 // Leaves job `jobIndex` (marked with opts.status, recorded in opts.list) and
 // opens the next one, or ends the run after the last.
+// Workday's own "application submitted" pages. After the last step Workday
+// sends the tab to ".../jobTasks/completed/application" or to the careers
+// home with "?Job_Application_ID=..." (titled "Congratulations"). Neither is
+// an application page, so they used to be counted as "URL pattern not
+// allowed" skips although the application had gone in.
+const WD_SUBMITTED_URL = /^https:\/\/[^/]+\.(myworkdayjobs|myworkdaysite)\.com\/.*(\/jobTasks\/completed\/application|[?&]Job_Application_ID=[0-9a-f]+)/i;
+const wdSubmittedSeen = new Set();
+function isWorkdaySubmittedUrl(url) {
+  return WD_SUBMITTED_URL.test(String(url || ""));
+}
+
+// Records job `idx` of the state under `stateKey` as applied: status
+// "completed" plus LazyApply's job-applications record (what "Applied Today"
+// counts), unless the application script already did both.
+async function recordWorkdaySubmitted(stateKey, idx, pendingKey) {
+  pendingKey = pendingKey || "pendingAnalytics";
+  const raw = await chrome.storage.local.get([stateKey, pendingKey, "token", "applicationSessionId", "resumeMeta", "v2Id", "user", "routeHeaders"]);
+  const st = raw[stateKey];
+  const link = st && st.links && st.links[idx];
+  if (!link) return false;
+  if (link.status !== "completed") {
+    link.status = "completed";
+    link.currentState = "completed";
+    await chrome.storage.local.set({ [stateKey]: st });
+  }
+  if (link.analyticCall || raw[pendingKey]) return true; // already recorded, or being recorded
+  try {
+    const token = raw.token;
+    const v2Id = raw.v2Id || (raw.user && raw.user.v2Id);
+    const resumeId = raw.resumeMeta && raw.resumeMeta.resumeId;
+    if (!token || !v2Id || !resumeId || !raw.applicationSessionId) return true;
+    const extra = (url) => {
+      for (const [route, h] of Object.entries(raw.routeHeaders || {})) {
+        if (route.endsWith("*") ? url.startsWith(route.slice(0, -1)) : url === route) return h || {};
+      }
+      return {};
+    };
+    const resumeUrl = "https://backend.lazyapply.com/lazyapplyV2/resume/" + resumeId;
+    const resume = await fetch(resumeUrl, { headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, ...extra(resumeUrl) } })
+      .then((r) => r.json())
+      .then((j) => (j && j.data) || {})
+      .catch(() => ({}));
+    if (!resume.resumeId) return true;
+    const apiUrl = "https://backend.lazyapply.com/lazyapplyV2/job-applications/" + v2Id;
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, ...extra(apiUrl) },
+      body: JSON.stringify({
+        sessionId: raw.applicationSessionId,
+        resumeName: resume.resumeName,
+        resumeId: resume.resumeId,
+        atsName: link.jobBoard || "workday",
+        jobLink: link.url || "",
+        jobId: link.jobId || "no_jobid",
+        jobTitle: link.title || "",
+        companyName: link.companyName || "",
+        applicationStatus: "completed",
+        emailApply: st.emailApplyOption,
+        emailStatus: st.emailApplyOption ? "email_process_started" : null,
+      }),
+    });
+    if (res.ok) {
+      const again = (await chrome.storage.local.get(stateKey))[stateKey];
+      if (again && again.links && again.links[idx]) {
+        again.links[idx].analyticCall = true;
+        await chrome.storage.local.set({ [stateKey]: again });
+      }
+    }
+  } catch (e) {
+    console.error("Could not record the submitted application", e);
+  }
+  return true;
+}
+
 async function moveOnFromJob(jobIndex, opts) {
   {
     const tabState = await chrome.storage.local.get("automationTabId");
@@ -1510,7 +1584,25 @@ chrome.tabs.onUpdated.addListener(async function (tabId, changeInfo, tab) {
 
       const isAllowed = isUrlInAllowedPatterns(tab.url);
 
-      if (!isAllowed) {
+      if (!isAllowed && isWorkdaySubmittedUrl(tab.url)) {
+        // Workday's "submitted" page: the job was applied to, not skipped.
+        const idx = state.applicationState.currentIndex;
+        const link = (state.applicationState.links || [])[idx];
+        const key = idx + "|" + (link && link.url);
+        if (link && !wdSubmittedSeen.has(key)) {
+          wdSubmittedSeen.add(key);
+          setTimeout(async () => {
+            try {
+              const now = (await chrome.storage.local.get("applicationState")).applicationState;
+              if (!now || now.currentIndex !== idx || !now.isAutomationActive) return;
+              await recordWorkdaySubmitted("applicationState", idx);
+              await moveOnFromJob(idx, { main: "Application submitted", status: "completed", list: "submittedLinks" });
+            } catch (err) {
+              console.error("Error finishing submitted job:", err);
+            }
+          }, 12000); // the application script checks for 10 s and may record it itself
+        }
+      } else if (!isAllowed) {
         console.log(
           `URL ${tab.url} does not match allowed patterns. Skipping...`
         );

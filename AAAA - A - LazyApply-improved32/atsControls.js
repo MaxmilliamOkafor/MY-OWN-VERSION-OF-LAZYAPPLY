@@ -774,6 +774,29 @@
     skipLog("Skipped: no Apply button found on the job page after 4 looks over about 10 seconds.");
     return false;
   }
+  /**
+   * Workday: a script error while working the form ("Cannot read properties
+   * of null ...", usually the page changing under it) used to fail the job at
+   * once. Instead the page is reloaded once and the application picks up again
+   * (Workday keeps the answers saved so far). Returns true when a retry was
+   * started, so the caller does not mark the job as failed.
+   */
+  function crashRetry(err) {
+    try {
+      if (!/(^|\.)(myworkdayjobs|myworkdaysite)\.com$/i.test(location.hostname)) return false;
+      const msg = String((err && err.message) || err || "");
+      if (!/cannot read propert|is not a function|is null|is undefined|of undefined|of null/i.test(msg)) return false;
+      const job = location.pathname.replace(/\/apply(\/.*)?$/, "");
+      const key = "lazyCrashRetry:" + job;
+      if (sessionStorage.getItem(key)) return false; // tried once already: let it fail
+      sessionStorage.setItem(key, String(Date.now()));
+      skipLog("Workday script error (" + msg.slice(0, 100) + "): reloading the page to try once more.");
+      setTimeout(() => location.reload(), 1500);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   function applyWait() {
     try {
       const y = window.scrollY;
@@ -793,5 +816,5 @@
     } catch (e) {}
   }
 
-  g.__lazyAts = { jobSubmitted, rememberProfile, referralInfo, pageNotFound, applyRetry, applyWait, pageJobMeta, jobMetaFromText, jobMetaFromLd, ownMail, emailGate, emailOutcome, emailLog, jobIdFromText, jobIdFromLd, pageJobId, captureJobId, findPeopleFetch, accountPassword, workdayAccount, saveWorkdayAccount, icimsFallback, norm, similarity, matchIndex, bestNode, sharesWord, closeList, setSpin, setDateParts, submittedMark, textOf, searchOther, verifyWorkdayEmail, verifyState, version: 1 };
+  g.__lazyAts = { jobSubmitted, rememberProfile, referralInfo, pageNotFound, applyRetry, applyWait, pageJobMeta, jobMetaFromText, jobMetaFromLd, ownMail, emailGate, emailOutcome, emailLog, jobIdFromText, jobIdFromLd, pageJobId, captureJobId, findPeopleFetch, accountPassword, workdayAccount, saveWorkdayAccount, icimsFallback, norm, similarity, matchIndex, bestNode, sharesWord, closeList, setSpin, setDateParts, submittedMark, textOf, searchOther, verifyWorkdayEmail, verifyState, crashRetry, version: 1 };
 })();
