@@ -29,6 +29,13 @@
  *  - with no progress: 45 s idle, or 150 s in total.
  * Pressing keys or clicking in the page yourself holds it off for 60 s.
  *
+ * The automation's own status ("Analyzing Form...", "Processing Questions...",
+ * "Answering Questions...", "Submitting Form...") also counts as busy: while
+ * it shows, the automation is waiting for the AI answers or the server, which
+ * changes nothing on screen. (Before, Greenhouse and Ashby jobs were left
+ * 20 s into that wait, just before the answers arrived.) This holds for up to
+ * 3 minutes; the run's own job timeout still applies.
+ *
  * Greenhouse, Lever, Ashby, iCIMS, Rippling, SmartRecruiters: only one rule.
  * When a required question is still empty after the form was filled ("This
  * field is required" shown) and nothing changes for 20 s while the automation
@@ -51,7 +58,11 @@
     required: 20000, requiredMax: 75000,
     seenMax: 200,
     verifyGrace: 45000,
+    workingMax: 180000,
   };
+  // Statuses the automation shows while it works (see AUTOMATION_CONTROL messages).
+  const WORKING = /^\s*(applying now|analy[sz]ing form|processing|uploading resume|processing questions|answering questions|submitting form|filling|generating|uploading)/i;
+  const working = (s, now) => !!(s.phase && WORKING.test(s.phase) && now - s.phaseAt < STUCK.workingMax);
   const WD_HOST = /(^|\.)(myworkdayjobs|myworkdaysite|myworkday)\.com$/i;
   const OTHER_HOST = /(^|\.)(greenhouse\.io|lever\.co|ashbyhq\.com|icims\.com|rippling\.com|smartrecruiters\.com)$/i;
   const SITE_NAME = [[/greenhouse/i, "Greenhouse"], [/lever/i, "Lever"], [/ashby/i, "Ashby"], [/icims/i, "iCIMS"], [/rippling/i, "Rippling"], [/smartrecruiters/i, "SmartRecruiters"], [/workday/i, "Workday"]];
@@ -140,7 +151,7 @@
     }
     if (p.auth) { if (s.authSince == null) s.authSince = now; } else s.authSince = null;
     if (now - s.hands < STUCK.hands) return "";
-    const busy = s.busy || -Infinity;
+    const busy = working(s, now) ? now : s.busy || -Infinity;
     if (p.dead) { if (s.deadSince == null) s.deadSince = now; if (now - s.deadSince >= STUCK.dead) return p.dead; } else s.deadSince = null;
     if (p.errors) {
       if (p.errors !== s.errText) { s.errText = p.errors; s.errSince = now; }
@@ -168,6 +179,8 @@
     if (p.submitted) { s.moved = now; return ""; }
     if (now - s.hands < STUCK.hands) return "";
     if (!p.required) { s.errText = ""; s.errSince = null; return ""; }
+    // Still working (waiting for answers, uploading, submitting): count from when it stops.
+    if (working(s, now)) { s.errText = p.required; s.errSince = now; return ""; }
     if (p.required !== s.errText) { s.errText = p.required; s.errSince = now; }
     const since = Math.max(s.errSince, s.moved);
     if (now - Math.max(since, s.busy || -Infinity) >= STUCK.required) return "required question left unanswered: " + p.required.slice(0, 100);
@@ -176,7 +189,7 @@
   }
 
   function fresh(now) {
-    return { key: "", seen: new Set(), moved: now, busy: -Infinity, errText: "", errSince: null, deadSince: null, authSince: null, hands: -Infinity, sent: false };
+    return { key: "", seen: new Set(), moved: now, busy: -Infinity, phase: "", phaseAt: 0, errText: "", errSince: null, deadSince: null, authSince: null, hands: -Infinity, sent: false };
   }
 
   function watch() {
@@ -195,6 +208,16 @@
       s.startVerify = () => { if (ats()) ats().verifyWorkdayEmail(null, null); };
     }
     ["click", "input", "change", "keydown", "mousedown", "mouseup", "focusin"].forEach((t) => document.addEventListener(t, work, true));
+    // The automation's status, sent to this tab by the background.
+    try {
+      chrome.runtime.onMessage.addListener((m) => {
+        const main = m && (typeof m.automationControlMessageMain === "string" ? m.automationControlMessageMain : m.message && m.message.automationControlMessageMain);
+        if (typeof main !== "string") return;
+        const now = Date.now();
+        s.busy = now;
+        if (main !== s.phase) { s.phase = main; s.phaseAt = now; }
+      });
+    } catch (e) {}
     const timer = setInterval(() => {
       if (s.sent) return;
       let why = "";
@@ -209,7 +232,7 @@
             clearInterval(timer);
           } else {
             // Paused, or not a run's tab: start counting again.
-            Object.assign(s, fresh(Date.now()), { hands: s.hands, busy: s.busy });
+            Object.assign(s, fresh(Date.now()), { hands: s.hands, busy: s.busy, phase: s.phase, phaseAt: s.phaseAt });
           }
         });
       } catch (e) {
@@ -218,6 +241,6 @@
     }, STUCK.tick);
   }
 
-  g.__lazyStuck = { probe, step, stepOther, fresh, hold, STUCK };
+  g.__lazyStuck = { probe, step, stepOther, fresh, hold, working, STUCK };
   try { watch(); } catch (e) {}
 })();
